@@ -155,8 +155,10 @@
              var displayText = JSON.parse(json).DisplayText
             if (displayText && displayText.toLowerCase().indexOf('apple') > -1) {
                 console.log('YOU GET AN APPLE!!!!!')
+                hypothesisDiv.innerHTML = 'YOU GET AN APPLE!!!'
             }else{
                 console.log('not an apple')
+                hypothesisDiv.innerHTML = ''
             }
         }
         function OnSpeechEndDetected() {
@@ -202,6 +204,10 @@
                             <div class="form-group">
                                 <p class="help-block">
                                     <table width="100%">
+                                            <tr>
+                                                    <td></td>
+                                                    <td>Say something like "I want an apple"</td>
+                                                </tr>
                                             <tr>
                                                 <td></td>
                                                 <td>Current hypothesis: <span id="hypothesisDiv"></span></td>

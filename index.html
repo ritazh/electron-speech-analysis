@@ -1,0 +1,253 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>if (typeof module === 'object') { window.module = module; module = undefined; }</script>
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    
+    <script src="js/FileSaver.min.js"></script>
+
+    <script src="js/recorderjs/recorder.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/chroma.js"></script>
+    <script>
+        window.nodeRquire = window.require;
+        window.require = undefined;
+    </script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.3/require.min.js"></script>
+    <script>
+            window.otherRequire = window.require;
+            window.require = nodeRquire;
+    </script>
+    <script src="node_modules/microsoft-speech-browser-sdk/distrib/speech.browser.sdk-min.js"></script>
+    
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/custom.css">
+
+    <script>if (window.module) module = window.module;</script>
+    
+
+    <script>
+        // On doument load resolve the SDK dependecy
+        function Initialize(onComplete) {
+            otherRequire(["Speech.Browser.Sdk"], function(SDK) {
+                onComplete(SDK);
+            });
+        }
+        
+        // Setup the recongizer
+        function RecognizerSetup(SDK, recognitionMode, language, format, subscriptionKey) {
+            var recognizerConfig = new SDK.RecognizerConfig(
+                new SDK.SpeechConfig(
+                    new SDK.Context(
+                        new SDK.OS(navigator.userAgent, "Browser", null),
+                        new SDK.Device("SpeechSample", "SpeechSample", "1.0.00000"))),
+                recognitionMode, // SDK.RecognitionMode.Interactive  (Options - Interactive/Conversation/Dictation>)
+                language, // Supported laguages are specific to each recognition mode. Refer to docs.
+                format); // SDK.SpeechResultFormat.Simple (Options - Simple/Detailed)
+            // Alternatively use SDK.CognitiveTokenAuthentication(fetchCallback, fetchOnExpiryCallback) for token auth
+            var authentication = new SDK.CognitiveSubscriptionKeyAuthentication(subscriptionKey);
+            return SDK.CreateRecognizer(recognizerConfig, authentication);
+        }
+        // Start the recognition
+        function RecognizerStart(SDK, recognizer) {
+            recognizer.Recognize((event) => {
+                /*
+                 Alternative syntax for typescript devs.
+                 if (event instanceof SDK.RecognitionTriggeredEvent)
+                */
+                switch (event.Name) {
+                    case "RecognitionTriggeredEvent" :
+                        UpdateStatus("Initializing");
+                        break;
+                    case "ListeningStartedEvent" :
+                        UpdateStatus("Listening");
+                        break;
+                    case "RecognitionStartedEvent" :
+                        UpdateStatus("Listening_Recognizing");
+                        break;
+                    case "SpeechStartDetectedEvent" :
+                        UpdateStatus("Listening_DetectedSpeech_Recognizing");
+                        console.log(JSON.stringify(event.Result)); // check console for other information in result
+                        break;
+                    case "SpeechHypothesisEvent" :
+                        UpdateRecognizedHypothesis(event.Result.Text);
+                        console.log(JSON.stringify(event.Result)); // check console for other information in result
+                        break;
+                    case "SpeechEndDetectedEvent" :
+                        OnSpeechEndDetected();
+                        UpdateStatus("Processing_Adding_Final_Touches");
+                        console.log(JSON.stringify(event.Result)); // check console for other information in result
+                        break;
+                    case "SpeechSimplePhraseEvent" :
+                        UpdateRecognizedPhrase(JSON.stringify(event.Result, null, 3));
+                        break;
+                    case "SpeechDetailedPhraseEvent" :
+                        UpdateRecognizedPhrase(JSON.stringify(event.Result, null, 3));
+                        break;
+                    case "RecognitionEndedEvent" :
+                        OnComplete();
+                        UpdateStatus("Idle");
+                        console.log(JSON.stringify(event)); // Debug information
+                        break;
+                }
+            })
+            .On(() => {
+                // The request succeeded. Nothing to do here.
+            },
+            (error) => {
+                console.error(error);
+            });
+        }
+        // Stop the Recognition.
+        function RecognizerStop(SDK, recognizer) {
+            // recognizer.AudioSource.Detach(audioNodeId) can be also used here. (audioNodeId is part of ListeningStartedEvent)
+            recognizer.AudioSource.TurnOff();
+        }
+    </script>
+
+
+    <!-- Browser Hooks -->
+    <script>
+        var hypothesisDiv, phraseDiv, statusDiv;
+        var SDK;
+        var recognizer;
+        document.addEventListener("DOMContentLoaded", function () {
+            phraseDiv = document.getElementById("phraseDiv");
+            hypothesisDiv = document.getElementById("hypothesisDiv");
+            statusDiv = document.getElementById("statusDiv");
+           
+            Initialize(function (speechSdk) {
+                SDK = speechSdk;
+            });
+        });
+        function Triggered(){
+            console.log('triggered called');
+            if (!recognizer) {
+                Setup();
+            }
+            hypothesisDiv.innerHTML = "";
+            phraseDiv.innerHTML = "";
+            RecognizerStart(SDK, recognizer);
+        }
+        function stop(){
+            console.log('stop triggered')
+            RecognizerStop(SDK, recognizer);
+        }
+        
+        function Setup() {
+            // RecognitionMode.Conversation makes it run continuously
+            recognizer = RecognizerSetup(SDK, SDK.RecognitionMode.Conversation, 'en-US', SDK.SpeechResultFormat.Simple, '447e3aec002a4096b41f09e8651858b0');
+        }
+        function UpdateStatus(status) {
+            statusDiv.innerHTML = status;
+        }
+        function UpdateRecognizedHypothesis(text) {
+            hypothesisDiv.innerHTML = text;
+
+            
+        }
+        function UpdateRecognizedPhrase(json) {
+             phraseDiv.innerHTML = json;
+             var displayText = JSON.parse(json).DisplayText
+            if (displayText && displayText.toLowerCase().indexOf('apple') > -1) {
+                console.log('YOU GET AN APPLE!!!!!')
+            }else{
+                console.log('not an apple')
+            }
+        }
+        function OnSpeechEndDetected() {
+        }
+        function OnComplete() {
+        }
+    </script>
+</head>
+<body>
+    <div class="container-fluid">
+        <h3>Welcome</h3>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div id="configurationpanel" class="panel panel-default hidden">
+                    <div class="panel-heading">
+                        Configuration
+                        <span class="pull-right ndb-success-danger">Something's wrong.. :(</span>
+                        <span class="pull-right ndb-success-message">All systems go!</span>
+                    </div>
+                    <div class="panel-body">
+                        <form id="configuration">
+                            <div class="form-group">
+                                <label for="deviceid" class="control-label">Device ID</label>
+                                <input type="text" class="form-control" id="deviceid" name="deviceid" />
+                                <label for="decibellevel" class="control-label">Decibel Level</label>
+                                <input type="text" class="form-control" id="decibellevel" name="decibellevel" />
+                            </div>
+                            <div class="form-group">
+                                <button id="saveconfiguration" type="submit" class="btn btn-primary" data-loading-text="Saving...">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div id="statuspanel" class="panel panel-success hidden">
+                    <div class="panel-heading">
+                        All Set!
+                    </div>
+                    <div class="panel-body">
+                        <form id="status">
+                            <div class="form-group">
+                                <p class="help-block">
+                                    <table width="100%">
+                                            <tr>
+                                                <td></td>
+                                                <td>Current hypothesis: <span id="hypothesisDiv"></span></td>
+                                            </tr>
+                                            <tr>
+                                                <td></td>
+                                                <td>
+                                                    <textarea id="phraseDiv" style="width:500px;height:200px"></textarea>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td></td>
+                                                <td>Status: <span id="statusDiv"></span></td>
+                                            </tr>
+                                        </table>
+                                </p>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="canvas" width="150" height="150" style="display: block; background-color:white ;"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12 hidden">
+                <div id="container"></div>
+                <h3>Testing Area!</h3>
+                <div>
+                    <button id="btnRecord"
+                            class=" btn_mic
+                            btn
+                            btn-danger
+                            btn-large
+                            btnup"
+                            type="button"
+                            onmousedown="btnRecordDown(this)"
+                            onmouseup="btnRecordUp(this)"
+                            onmouseout="btnRecordOut(this)"></button>
+                </div>
+                <hr />
+                <div class="well">
+                    Hold the button to record. Release to end.
+                </div>
+
+            </div>
+        </div>
+    </div>
+</body>
+</html>
